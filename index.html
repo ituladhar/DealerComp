@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compensation Calculator - Ishwor Tuladhar</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React, ReactDOM, and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Montserrat Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+          --metro-magenta: #E2007A;
+          --metro-magenta-light: #fdf2f8;
+      }
+      .font-montserrat { font-family: 'Montserrat', sans-serif; }
+      .table-cell-border {
+         border-left: 1px solid #e5e7eb;
+         border-right: 1px solid #e5e7eb;
+      }
+      .text-magenta { color: var(--metro-magenta); }
+      .border-magenta { border-color: var(--metro-magenta); }
+      .focus-border-magenta:focus { border-color: var(--metro-magenta); }
+      .focus-ring-magenta:focus { --tw-ring-color: var(--metro-magenta); }
+      .bg-magenta-light { background-color: var(--metro-magenta-light); }
+      .group-hover\:bg-fuchsia-100\/30 { background-color: rgba(243, 232, 255, 0.3); }
+      .no-spinners {
+        -webkit-appearance: none;
+        -moz-appearance: textfield;
+      }
+      .no-spinners::-webkit-inner-spin-button,
+      .no-spinners::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+    </style>
+</head>
+<body class="bg-zinc-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // LucideIcon Component
+        const LucideIcon = ({ name, className = '' }) => {
+          const iconData = lucide[name];
+          if (!iconData) return null;
+
+          const paths = iconData.map(([tag, props], i) => {
+            const attrs = Object.entries(props)
+              .map(([k, v]) => `${k}="${v}"`)
+              .join(' ');
+            return `<${tag} ${attrs} />`;
+          }).join('');
+
+          const svg = `
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="${className}"
+            >
+              ${paths}
+            </svg>
+          `;
+          return <span dangerouslySetInnerHTML={{ __html: svg }} />;
+        };
+
+        // Initial metrics
+        const initialMetrics = [
+          { name: "Gross Prepaid Act Conversion", key: "grossPrepaid", targetRate: 0.085, actualRate: 0.066, mrc: 0, includeInTotal: false },
+          { name: "Phone Act Conversion", key: "phoneAct", targetRate: 0.050, actualRate: 0.034, mrc: 55, includeInTotal: true },
+          { name: "BTS Act Conversion (Excl HSI)", key: "btsAct", targetRate: 0.025, actualRate: 0.027, mrc: 20, includeInTotal: true },
+          { name: "HSI Conversion", key: "hsi", targetRate: 0.010, actualRate: 0.005, mrc: 55, includeInTotal: true },
+        ];
+
+        const formatCurrency = (value) => {
+          return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(value);
+        };
+
+        const displayPercentage = (value) => {
+            const percentValue = value * 100;
+            return percentValue.toFixed(3).replace(/\.?0*$/, '');
+        };
+
+        const getTodayDate = () => new Date().toISOString().split('T')[0];
+        const getFirstDayOfMonth = () => {
+          const now = new Date();
+          return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        };
+
+        const App = () => {
+          const [storeAddress, setStoreAddress] = useState('123 Street Name');
+          const [exitTraffic, setExitTraffic] = useState(2565);
+          const [startDate, setStartDate] = useState(getFirstDayOfMonth());
+          const [endDate, setEndDate] = useState(getTodayDate());
+          const [metrics, setMetrics] = useState(initialMetrics);
+
+          const handleInputChange = (e, setter) => {
+            const value = e.target.value;
+            if (setter === setExitTraffic) {
+                setter(value ? parseFloat(value) : 0);
+            } else {
+                setter(value);
+            }
+          };
+
+          const handleMetricChange = (index, field, value) => {
+            const isRateField = field === 'targetRate' || field === 'actualRate';
+            const numericValue = parseFloat(value);
+            let calculatedValue = numericValue;
+
+            if (isRateField) {
+                calculatedValue = numericValue / 100;
+            }
+            setMetrics(prevMetrics =>
+              prevMetrics.map((metric, i) =>
+                i === index ? { ...metric, [field]: calculatedValue } : metric
+              )
+            );
+          };
+
+          const calculations = useMemo(() => {
+            let totalEstimatedCompensation = 0;
+            let totalPotentialCompensation = 0;
+
+            const componentMetrics = metrics.filter(m => m.includeInTotal);
+            const grossPrepaidCalculatedTargetRate = componentMetrics.reduce((sum, m) => sum + (m.targetRate || 0), 0);
+            const grossPrepaidCalculatedActualRate = componentMetrics.reduce((sum, m) => sum + (m.actualRate || 0), 0);
+
+            const calculatedMetrics = metrics.map(metric => {
+              const traffic = exitTraffic > 0 ? exitTraffic : 0;
+              let actualRate = metric.actualRate > 0 ? metric.actualRate : 0;
+              let targetRate = metric.targetRate > 0 ? metric.targetRate : 0;
+              let mrc = metric.mrc > 0 ? metric.mrc : 0;
+
+              if (metric.key === 'grossPrepaid') {
+                targetRate = grossPrepaidCalculatedTargetRate;
+                actualRate = grossPrepaidCalculatedActualRate;
+                mrc = 0;
+              }
+
+              const actualActivations = actualRate * traffic;
+              const targetActivations = targetRate * traffic;
+              const actualCompensation = actualActivations * (metric.includeInTotal ? mrc : 0);
+              const potentialCompensation = targetActivations * (metric.includeInTotal ? mrc : 0);
+
+              if (metric.includeInTotal) {
+                totalEstimatedCompensation += actualCompensation;
+                totalPotentialCompensation += potentialCompensation;
+              }
+
+              return {
+                ...metric,
+                targetRate,
+                actualRate,
+                actualActivations,
+                targetActivations,
+                actualCompensation,
+                potentialCompensation,
+                variance: actualRate - targetRate,
+              };
+            });
+
+            const finalCalculatedMetrics = calculatedMetrics.map(metric => {
+                if (metric.key === 'grossPrepaid') {
+                    return {
+                        ...metric,
+                        actualCompensation: totalEstimatedCompensation,
+                        potentialCompensation: totalPotentialCompensation,
+                    };
+                }
+                return metric;
+            });
+
+            const gapCompensation = totalPotentialCompensation - totalEstimatedCompensation;
+
+            return {
+              calculatedMetrics: finalCalculatedMetrics,
+              totalEstimatedCompensation,
+              totalPotentialCompensation,
+              gapCompensation,
+            };
+          }, [exitTraffic, metrics]);
+
+          const StatCard = ({ title, value, icon, colorClass, description }) => (
+            <div className={`p-4 bg-white rounded-xl shadow-lg border-t-4 ${colorClass} transition transform hover:scale-[1.02] cursor-default`}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-600 uppercase">{title}</h3>
+                <LucideIcon name={icon} className={`w-6 h-6 ${colorClass.replace('border-t-4 ', 'text-')}`} />
+              </div>
+              <p className="mt-1 text-3xl font-extrabold text-gray-900">{value}</p>
+              <p className="mt-1 text-xs text-zinc-500">{description}</p>
+            </div>
+          );
+
+          const successColor = 'emerald';
+          const dangerColor = 'red';
+
+          return (
+            <div className="min-h-screen p-4 sm:p-8 font-sans" style={{backgroundColor: '#f4f4f5'}}>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <header className="text-center mb-8 pt-4">
+                  <h1 className={`text-5xl font-black text-magenta font-montserrat tracking-tight`}>Compensation Calculator</h1>
+                  <p className="mt-3 text-base text-zinc-500 italic">Track and forecast dealer commission based on exit traffic and conversion targets.</p>
+                </header>
+
+                <div className="bg-white p-6 rounded-xl shadow-2xl mb-8 border-t-4 border-zinc-200">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className='flex items-center space-x-3'>
+                      <LucideIcon name="MapPin" className='w-6 h-6 text-zinc-500' />
+                      <div className='flex-grow'>
+                        <label htmlFor="storeAddress" className="block text-sm font-semibold text-zinc-800">Store/Location Address</label>
+                        <input
+                          id="storeAddress"
+                          type="text"
+                          value={storeAddress}
+                          onChange={(e) => handleInputChange(e, setStoreAddress)}
+                          className="mt-1 block w-full rounded-lg border-zinc-300 shadow-sm focus-border-magenta focus-ring-magenta p-2 border text-zinc-900"
+                          placeholder="e.g., 123 Street Name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className='flex items-center space-x-3'>
+                      <LucideIcon name="Clock" className='w-6 h-6 text-zinc-500' />
+                      <div className='flex-grow'>
+                        <label htmlFor="exitTraffic" className="block text-sm font-semibold text-zinc-800">Exit Traffic</label>
+                        <input
+                          id="exitTraffic"
+                          type="number"
+                          value={exitTraffic}
+                          onChange={(e) => handleInputChange(e, setExitTraffic)}
+                          className="mt-1 block w-full rounded-lg border-zinc-300 shadow-sm focus-border-magenta focus-ring-magenta p-2 border text-zinc-900 no-spinners"
+                          placeholder="e.g., 2565"
+                        />
+                      </div>
+                    </div>
+
+                    <div className='flex items-center space-x-3'>
+                      <LucideIcon name="Calendar" className='w-6 h-6 text-zinc-500' />
+                      <div className='flex-grow'>
+                        <label htmlFor="startDate" className="block text-sm font-semibold text-zinc-800">Start Date</label>
+                        <input
+                          id="startDate"
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="mt-1 block w-full rounded-lg border-zinc-300 shadow-sm focus-border-magenta focus-ring-magenta p-2 border text-zinc-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className='flex items-center space-x-3'>
+                      <LucideIcon name="Calendar" className='w-6 h-6 text-zinc-500' />
+                      <div className='flex-grow'>
+                        <label htmlFor="endDate" className="block text-sm font-semibold text-zinc-800">End Date (MTD)</label>
+                        <input
+                          id="endDate"
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="mt-1 block w-full rounded-lg border-zinc-300 shadow-sm focus-border-magenta focus-ring-magenta p-2 border text-zinc-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <StatCard
+                        title="Total Estimated Compensation"
+                        value={formatCurrency(calculations.totalEstimatedCompensation)}
+                        icon="DollarSign"
+                        colorClass={`border-t-4 border-${successColor}-500 text-${successColor}-600`}
+                        description="Total earned compensation based on Actual Rates."
+                    />
+                    <StatCard
+                        title="Total Potential Compensation"
+                        value={formatCurrency(calculations.totalPotentialCompensation)}
+                        icon="Target"
+                        colorClass="border-t-4 border-magenta text-magenta"
+                        description="Compensation if Market Targets were met."
+                    />
+                    <StatCard
+                        title="Compensation Gap"
+                        value={formatCurrency(calculations.gapCompensation)}
+                        icon="RefreshCw"
+                        colorClass={`border-t-4 ${calculations.gapCompensation < 0 ? `border-${successColor}-500 text-${successColor}-600` : `border-${dangerColor}-500 text-${dangerColor}-600`}`}
+                        description="Difference between Potential and Estimated earnings."
+                    />
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-2xl overflow-x-auto mb-8">
+                  <h2 className={`text-xl font-bold mb-4 text-magenta`}>Conversion Metrics Breakdown</h2>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 border-b border-gray-300">
+                      <tr>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider sticky left-0 bg-gray-50 w-56 align-top">Metric</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Target Rate (%)</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Actual Rate (%)</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Compensation MRC ($)</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Actual Activations</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Potential Activations</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top table-cell-border">Actual Comp ($)</th>
+                        <th className="px-2 py-3 text-center text-xs font-bold text-zinc-700 uppercase tracking-wider align-top">Potential Comp ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {calculations.calculatedMetrics.map((metric, index) => (
+                        <tr
+                            key={metric.key}
+                            className={
+                                metric.key === 'grossPrepaid'
+                                    ? `bg-magenta-light text-base border-t-2 border-zinc-200`
+                                    : 'hover:bg-zinc-50/50 text-zinc-800 group'
+                            }
+                        >
+                          <td className="px-3 py-3 whitespace-nowrap sticky left-0 border-r border-gray-200 w-56"
+                            style={{ backgroundColor: metric.key === 'grossPrepaid' ? 'var(--metro-magenta-light)' : 'white' }}
+                          >
+                            <span className={metric.key === 'grossPrepaid' ? 'font-semibold' : 'font-semibold'}>
+                                {metric.name}
+                            </span>
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border ${metric.key === 'grossPrepaid' ? 'font-semibold' : ''}`}>
+                            {metric.key === 'grossPrepaid' ? (
+                              <span className="font-semibold text-magenta">
+                                {displayPercentage(metric.targetRate)}%
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-center space-x-1">
+                                  <input
+                                      type="number"
+                                      step="0.1"
+                                      value={displayPercentage(metric.targetRate)}
+                                      onChange={(e) => handleMetricChange(index, 'targetRate', e.target.value)}
+                                      className="w-16 text-sm rounded-md border border-zinc-300 p-1 text-center focus-border-magenta focus-ring-magenta no-spinners"
+                                  />
+                                  <span className="text-sm text-zinc-700">%</span>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border ${metric.key === 'grossPrepaid' ? 'font-semibold' : ''}`}>
+                            {metric.key === 'grossPrepaid' ? (
+                              <span className="font-semibold text-magenta">
+                                {displayPercentage(metric.actualRate)}%
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-center space-x-1">
+                                  <input
+                                      type="number"
+                                      step="0.1"
+                                      value={displayPercentage(metric.actualRate)}
+                                      onChange={(e) => handleMetricChange(index, 'actualRate', e.target.value)}
+                                      className="w-16 text-sm rounded-md border border-zinc-300 p-1 text-center focus-border-magenta focus-ring-magenta no-spinners"
+                                  />
+                                  <span className="text-sm text-zinc-700">%</span>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border ${metric.key === 'grossPrepaid' ? 'font-semibold' : ''}`}>
+                            {metric.key === 'grossPrepaid' ? (
+                              <span className="font-bold text-center block"></span>
+                            ) : (
+                              <div className="flex items-center justify-center space-x-1">
+                                  <span className="text-sm font-semibold text-zinc-700">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={metric.mrc.toFixed(2)}
+                                    onChange={(e) => handleMetricChange(index, 'mrc', e.target.value)}
+                                    className="w-16 text-sm rounded-md border border-zinc-300 p-1 text-center text-zinc-900 focus-border-magenta focus-ring-magenta no-spinners"
+                                  />
+                              </div>
+                            )}
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border ${metric.key === 'grossPrepaid' ? 'font-semibold' : 'text-zinc-700 group-hover:bg-fuchsia-100/30'}`}>
+                            {Math.round(metric.actualActivations)}
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border ${metric.key === 'grossPrepaid' ? 'font-semibold' : 'text-zinc-700 group-hover:bg-fuchsia-100/30'}`}>
+                            {Math.round(metric.targetActivations)}
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center table-cell-border`}>
+                            <span className={`font-semibold ${metric.key === 'grossPrepaid' ? `text-magenta` : `text-${successColor}-600 group-hover:bg-fuchsia-100/30`}`}>
+                                {formatCurrency(metric.actualCompensation)}
+                            </span>
+                          </td>
+
+                          <td className={`px-2 py-3 whitespace-nowrap text-center`}>
+                            <span className={`font-semibold ${metric.key === 'grossPrepaid' ? `text-magenta` : `text-magenta group-hover:bg-fuchsia-100/30`}`}>
+                                {formatCurrency(metric.potentialCompensation)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end p-4 bg-white rounded-xl shadow-md border-t border-zinc-200 mt-4">
+                    <div className="sm:w-3/4 text-center sm:text-left mb-2 sm:mb-0">
+                        <p className="text-xs text-zinc-500 italic leading-relaxed">
+                            <span className="font-bold not-italic text-zinc-700">Disclaimer:</span> This calculator provides an&nbsp;
+                            **estimate**&nbsp;of potential compensation based on the inputs provided and historical compensation factors.&nbsp;
+                            **Actual earnings may vary**&nbsp;and are subject to final audit, official compensation plans, and policy changes. 
+                            This tool is for informational and planning purposes only and does not constitute a guarantee of income.
+                        </p>
+                    </div>
+                    <p className="text-xs text-zinc-600 font-semibold text-center sm:text-right sm:w-1/4">
+                        Created by Ishwor Tuladhar
+                    </p>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
