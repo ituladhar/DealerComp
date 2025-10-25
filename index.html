@@ -186,7 +186,9 @@
                 return metric;
             });
 
-            const gapCompensation = totalPotentialCompensation - totalEstimatedCompensation;
+            // FIX: Ensure gapCompensation is never negative
+            const rawGapCompensation = totalPotentialCompensation - totalEstimatedCompensation;
+            const gapCompensation = Math.max(0, rawGapCompensation);
 
             return {
               calculatedMetrics: finalCalculatedMetrics,
@@ -299,7 +301,8 @@
                         title="Compensation Gap"
                         value={formatCurrency(calculations.gapCompensation)}
                         icon="RefreshCw"
-                        colorClass={`border-t-4 ${calculations.gapCompensation < 0 ? `border-${successColor}-500 text-${successColor}-600` : `border-${dangerColor}-500 text-${dangerColor}-600`}`}
+                        // Color logic needs to check raw gap, but value is capped at 0
+                        colorClass={`border-t-4 ${calculations.gapCompensation === 0 ? `border-${successColor}-500 text-${successColor}-600` : `border-${dangerColor}-500 text-${dangerColor}-600`}`}
                         description="Difference between Potential and Estimated earnings."
                     />
                 </div>
@@ -441,4 +444,3 @@
     </script>
 </body>
 </html>
-
