@@ -1,0 +1,34 @@
+/* T-Mobile/Metro Brand Hex Color */
+:root {
+    --metro-magenta: #E2007A;
+    --metro-magenta-light: #fdf2f8;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.table-cell-border {
+   border-left: 1px solid #e5e7eb;
+   border-right: 1px solid #e5e7eb;
+}
+
+.text-magenta { color: var(--metro-magenta); }
+.border-magenta { border-color: var(--metro-magenta); }
+.focus-border-magenta:focus { border-color: var(--metro-magenta); }
+.focus-ring-magenta:focus { --tw-ring-color: var(--metro-magenta); }
+.bg-magenta-light { background-color: var(--metro-magenta-light); }
+
+.group-hover\:bg-fuchsia-100\/30 {
+  background-color: rgba(243, 232, 255, 0.3);
+}
+
+.no-spinners {
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+.no-spinners::-webkit-inner-spin-button,
+.no-spinners::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
